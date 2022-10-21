@@ -1,4 +1,7 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
+from django.core.validators import MinValueValidator
 from django.db import models
 
 User = get_user_model()
@@ -44,15 +47,27 @@ class Account(models.Model):
         decimal_places=2,
         verbose_name="balance",
         help_text="User's account balance",
+        validators=(
+            MinValueValidator(
+                Decimal(0.0),
+                "Account balance can not be negative."
+            ),
+        )
     )
 
     class Meta:
         verbose_name = "Account"
         verbose_name_plural = "Accounts"
         ordering = ("-id",)
+        constraints = (
+            models.CheckConstraint(
+                check=models.Q(balance__gte=Decimal(0.0)),
+                name="Balance below zero is not allowed."
+            ),
+        )
 
     def __str__(self):
-        return f"<{self.user.username}:{self.balance}>"  # type:ignore
+        return f"<{self.user.username} (account_id={self.pk})>"  # type:ignore
 
 
 class Transaction(models.Model):

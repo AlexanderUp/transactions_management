@@ -26,11 +26,11 @@
 
 ```
 {
-    “signature”: “f4eae5b2881d8b6a1455f62502d08b2258d80084”,
-    “transaction_id”: 1234567,
-    “user_id”: 123456,
-    “bill_id”: 123456,
-    “amount”: 100
+    "signature": "f4eae5b2881d8b6a1455f62502d08b2258d80084",
+    "transaction_id": 1234567,
+    "user_id": 123456,
+    "bill_id": 123456,
+    "amount": 100
 }
 ```
 

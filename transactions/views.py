@@ -6,9 +6,9 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import Account, Item, Transaction
-from .serializers import (AccountSerializer, ItemSerializer,
-                          TransactionSerializer)
+from .models import Account, Item, Transaction, User
+from .serializers import (AccountReplenishmentSerializer, AccountSerializer,
+                          ItemSerializer, TransactionSerializer)
 
 
 class ItemViewSet(viewsets.ReadOnlyModelViewSet):
@@ -55,3 +55,29 @@ class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
         return Transaction.objects.filter(
             account__user=self.request.user
         ).select_related("account__user")
+
+
+class AccountReplenishmentViewSet(viewsets.ViewSet):
+
+    def partial_update(self, request):
+        serializer = AccountReplenishmentSerializer(data=request.data)
+        if serializer.is_valid():
+            user_id = serializer.data.get("user_id")
+            amount = serializer.data.get("amount")
+            user = get_object_or_404(User, pk=user_id)
+
+            account = min(
+                user.accounts.all(), key=lambda account: account.balance  # type:ignore
+            )
+            try:
+                with transaction.atomic():
+                    account.balance = F("balance") + amount
+                    account.save()
+            except IntegrityError:
+                return Response(
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            account.refresh_from_db()
+            account_serializer = AccountSerializer(account)
+            return Response(account_serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

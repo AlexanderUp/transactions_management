@@ -1,4 +1,5 @@
 from decimal import Decimal
+from email.policy import default
 
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator
@@ -47,6 +48,7 @@ class Account(models.Model):
         decimal_places=2,
         verbose_name="balance",
         help_text="User's account balance",
+        default=Decimal(0.0),
         validators=(
             MinValueValidator(
                 Decimal(0.0),

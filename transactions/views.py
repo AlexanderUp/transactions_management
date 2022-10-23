@@ -20,23 +20,27 @@ class ItemViewSet(viewsets.ReadOnlyModelViewSet):
         """
         Transaction will be created using account with max balance for user.
         """
-        item_id = request.data.get("id")
-        item = get_object_or_404(Item, pk=item_id)
+        item = get_object_or_404(Item, pk=request.data.get("id"))
         accounts = self.request.user.accounts.all()  # type:ignore
         account = max(accounts, key=lambda account: account.balance)
-        account_transaction = Transaction(account=account, amount=item.price)
         try:
             with transaction.atomic():
-                account.balance = F("balance") - account_transaction.amount
+                account.balance = F("balance") - item.price
                 account.save()
-                account_transaction.save()
+                account_transaction = Transaction.objects.create(
+                    account=account, amount=-item.price
+                )
         except IntegrityError:
+            account.refresh_from_db()
+            account_serializer = AccountSerializer(account)
             return Response(
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                account_serializer.data,
+                status=status.HTTP_403_FORBIDDEN
             )
-        account.refresh_from_db()
-        serializer = TransactionSerializer(account_transaction)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        transaction_serializer = TransactionSerializer(account_transaction)
+        return Response(
+            transaction_serializer.data, status=status.HTTP_201_CREATED
+        )
 
 
 class AccountViewSet(viewsets.ReadOnlyModelViewSet):
@@ -63,15 +67,18 @@ class AccountReplenishmentViewSet(viewsets.ViewSet):
         serializer = AccountReplenishmentSerializer(data=request.data)
         if serializer.is_valid():
             user_id = serializer.data.get("user_id")
+            account_id = serializer.data.get("account_id")
             amount = serializer.data.get("amount")
-            user = get_object_or_404(User, pk=user_id)
 
-            account = min(
-                user.accounts.all(), key=lambda account: account.balance  # type:ignore
-            )
+            user = get_object_or_404(User, pk=user_id)
+            account = get_object_or_404(user.accounts, pk=account_id)  # type:ignore
+
             try:
                 with transaction.atomic():
                     account.balance = F("balance") + amount
+                    Transaction.objects.create(
+                        account=account, amount=amount
+                    )
                     account.save()
             except IntegrityError:
                 return Response(
